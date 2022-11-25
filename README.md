@@ -20,7 +20,7 @@ c) `Adafruit CP2021N Friend - USB to Serial Converter` (Product nr 5335, https:/
 d) `STEMMA QT / Qwiic JST SH 4-pin to Premium Male Headers Cable - 150mm Long` cable (Product nr 4209, https://www.adafruit.com/product/4209)
 e) a small breadboard to put on the CP2102N and connect the dupont male SH pins.
 
-Flow of the GPS data:  PC MSFS2020 w FSUIPC7 > COMx > CP2102n TX/RX > to one of the two I2C connectors (preferebly #1).
+Flow of the GPS data:  PC MSFS2020 w FSUIPC7 > COMx > CP2102n TX/RX > to one of the two I2C connectors on the back of the Galactic Unicorn (preferebly #1).
 ```
 Serial connection: CP2102N TX > Galactic Unicorn I2C SDA (yellow wire)
                    CP2102N RX > Galactic Unicorn I2C SCL (blue wire)

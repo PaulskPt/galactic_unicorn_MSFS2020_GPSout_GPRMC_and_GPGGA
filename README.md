@@ -40,8 +40,7 @@ In later updates also other GPS data will become available to be displayed on th
 ```
 - Latitude/Longitude;
 - Altitude;
-- Groundspeed
-- Track (true) flown. 
+- Groundspeed.
 ```
 
 NOTE: The baudrate is set to 4800 baud (inside the FSUIPC7 > GPSout > 1 (or > 2). There, also select the correct COM-port for MS Windows 11)

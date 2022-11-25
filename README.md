@@ -27,7 +27,7 @@ Serial connection: CP2102N TX > Galactic Unicorn I2C SDA (yellow wire)
                    CP2102N 3V > Galactic Uniforn I2C Vcc (red wire)
                    CP2102N GND > Galactic Unicorn I2C GND (black wire)
 ```
-This project uses circuitpython.
+This project uses micropython.
 
 Goals of this project:
 

@@ -2,10 +2,8 @@
  Receive, fliter and dispay MSFS2020 GPS data on the 53 x 11 LED matrix display of the 'Galactic Unicorn'.
 
 
-Display flown track and other GPS data to the display of the esp-box and use ground speed to control the displayed data
+Display flown track to the display of the Galactic Unicorn and use ground speed to control the displayed data
 
-Software:
-See 'Examples'
 
 Used hardware:
 

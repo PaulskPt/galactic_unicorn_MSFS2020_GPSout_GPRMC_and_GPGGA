@@ -54,7 +54,7 @@ Next versions of this script will use the A, B, C and D buttons to select which 
 
 This script uses the ntptime kernal module of micropython to connect to a ntp time server.
 Please fill in the following in the file secrets.py:
-- WiFi SSDI;
+- WiFi SSID;
 - WiFi Password;
 - COUNTRY. e.g.: "PT" for Portugal. "USA" for United States of America. COUNTRY will be used in setting '.' for thousands and ',' for decimal marking if COUNTRY is "PT".
 - TZ_OFFSET. Your timezone offset to UTC in hours;

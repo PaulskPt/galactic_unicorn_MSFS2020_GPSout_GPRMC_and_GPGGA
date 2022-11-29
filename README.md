@@ -60,8 +60,16 @@ Please fill in the following in the file secrets.py:
 - TZ_OFFSET. Your timezone offset to UTC in hours;
 - NTP_SERVER, when you want to use a local NTP-Server.
 
-RESET:
-======
+No data:
+
+It sometimes happens that the CP2102N (or equivalent) is not receiving data from FSUIPC7. In that case the red led on the CP2102N will
+not blink. In function ck_uart(), in case there is no data received 100 times, the function nodata() will be called and the text
+`no data` will be displayed. If there is no data receive a 1000 times, the function ck_uart() will be exited and control will be back
+to function loop(). In the case of 'no data' it is advised to check: a) I2C wiring between the Galactic Unicorn and the CP2102N;
+b) check FSUIPC7 (Alt-F) menu `Options`, Item `GPS Out...`. Eventually exit (menu `File`, option `Exit`) and restart FSUIPC7. It takes some time before the led of the CP2102N will blink again.
+
+Reset:
+
 The script uses the Zzz button of the Galactic Unicorn (on the right side of the board in the middle) to reset the microcontroller.
 When you use this button be sure to disconnect the red wire of the I2C connection from the 3V pin of the CP2102N, otherwise in the Thonny
 IDE the 'stop/restart' button will not work and you will not be able to reach files on the board's filesystem. After you successfully

@@ -216,6 +216,7 @@ gs_item = 6 # Note the '$GPRMC' item is not counted
 
 # next four defs copied from:
 # I:\pico\paul_projects\pico\circuitpython\msfs2020_gps_rx_picolipo\2021-09-03_16h49_ver
+lacNoDataMsgShown = False
 lac_Stopped = True
 lacStopMsgShown = False
 lacTaxyMsgShown = False
@@ -923,6 +924,20 @@ def ck_gs():
         print(TAG,"value of v_gs = {}".format(v_gs), end='\n')
     return v_gs
 
+
+def nodata():
+    global lacNoDataMsgShown
+    TAG= "nodata()"
+    s = "no data"
+    lac_Stopped = False
+    lac_Taxying = True
+    lac_Stopped = False
+    lacStopMsgShown = False
+    if lacNoDataMsgShown == False:   
+        scroll_text(s, False) # *max_text_len
+        lacNoDataMsgShown = True
+    print(TAG+s)
+   
 """
  Function copied from: I:\pico\paul_projects\pico\circuitpython\msfs2020_gps_rx_picolipo\2021-09-03_16h49_ver
 """
@@ -1123,6 +1138,7 @@ def loop():
                     lp_cnt = 0
             # End if (chrs_rcvd > 0)
             else:
+                nodata()
                 # No GPS sentences data received. Exit...
                 pass
             if lstop == True:
@@ -1160,6 +1176,7 @@ def ck_uart():
     GPGGA_done = False
     nrGPRMC_bytes = 0
     nrGPGGA_bytes = 0
+    i = 0
     while True:
         try:
             gc.collect()
@@ -1169,6 +1186,11 @@ def ck_uart():
             if rx_buffer is not None:
                 nr_bytes = len(rx_buffer)
             else:
+                i += 1
+                if i > 1000:
+                    return 0  # Exit
+                if i > 0 and i % 100 == 0:
+                    nodata()
                 time.sleep(delay_ms)
                 continue
             if nr_bytes is not None:
@@ -1459,7 +1481,7 @@ def split_types():
     if lIsStr:
         rmc_msg_lst = sRMC.split(",")
         nr_RMC_items = len(rmc_msg_lst)
-        if not my_debug:
+        if my_debug:
             print(TAG+f"RMC items= {rmc_msg_lst}, nr RMC items= {nr_RMC_items}")
         if nr_RMC_items == 12:
             lGPRMC_go = True
@@ -1502,7 +1524,7 @@ def split_types():
             else:
                 rmc_lst.append("0")
 
-            if my_debug:
+            if not my_debug:
                 print(TAG+"rmc_lst=", rmc_lst)
 
             my_msgs.write(rmc_lst)
@@ -1844,3 +1866,4 @@ if __name__ == '__main__':
     main(False)
 
 # ----- END-OF-SKETCH -----
+

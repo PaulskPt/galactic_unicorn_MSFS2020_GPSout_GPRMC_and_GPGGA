@@ -60,6 +60,12 @@ Please fill in the following in the file secrets.py:
 - TZ_OFFSET. Your timezone offset to UTC in hours;
 - NTP_SERVER, when you want to use a local NTP-Server.
 
+RESET:
+The script uses the Zzz button of the Galactic Unicorn (on the right side of the board in the middle) to reset the microcontroller.
+When you use this button be sure to disconnect the red wire of the I2C connection from the 3V pin of the CP2102N, otherwise in the Thonny
+IDE the 'stop/restart' button will not work and you will not be able to reach file on the board's filesystem. After you successfully
+pressed the 'stop/restart' button in Thonny, you can re-connect the I2C red wire to the 3V pin of the CP2102N.
+
 I used the Mu-editor app to save, edit and test the script file: ```code.py```. I also used VSCode to find bugs and to copy the list of variables and functions.
 
 

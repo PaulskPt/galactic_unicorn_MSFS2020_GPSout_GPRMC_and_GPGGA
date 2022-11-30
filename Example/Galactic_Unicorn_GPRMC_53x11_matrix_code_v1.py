@@ -40,10 +40,12 @@
         
     Update 2022-11-30:
     IMPORTANT NOTE:
-    Do not connect the I2C red wire from the Galactic Unicorn to the +3V pin of the USB-to-serial
-    converter device. This will prevent the Galactic Unicorn to reset properly.
-    MS Windows e.g. will report an error that the connected USB device has not been recognized.
-    Only connect the SDA, SCL and GND wires of the Galactic Unicorn I2C (#1 or #2) have to
+    Only connect the SDA, SCL and GND wires of the Galactic Unicorn I2C connector (#1 or #2)
+    to the USB-to-serial connector device, e.g. a CP2102N.
+    Do not connect the I2C red wire from the Galactic Unicorn to the +3V pin of the USB-to-serial converter device. 
+    Connecting the red wire will prevent the Galactic Unicorn to reset properly:
+    - MS Windows e.g. will report an error that the connected USB device has not been recognized;
+    - The Thonny IDE 'stop/restart' button will not work and you will not be able to reach files on the board's filesystem. or #2) have to
     be connected to the USB-to-serial connector device, e.g. a CP2102N.
 
 """
@@ -232,6 +234,8 @@ acStopInitMonot = 0
 acStopInterval = 6000 # mSec
 lac_Taxying = False
 lacTaxyMsgShown = False
+lMagnetic = True
+lTrackDirChgd = False
 v_gs = 0
 
 gs_old = 0.0
@@ -1094,7 +1098,7 @@ def loop():
                     if not is_ac_stopped():
                         if is_ac_taxying(False):
                             lacTaxyMsgShown = False
-                            startup = 0
+                            #startup = 0
                         else:
                             if startup == -1:
                                 gr.clear()
@@ -1114,6 +1118,7 @@ def loop():
                                     return False
                             #lcd_pr_msgs()
                             gc.collect()
+                        startup = 0
                     else:
                         if t_parked_init == 0.00:
                             t_parked_init = time.ticks_ms()
@@ -1400,6 +1405,7 @@ def split_types():
     gga_lst = []
     rmc_msg_lst = []
     gga_msg_lst = []
+    t_alt = 0
     le_dict = 0
 
     if my_debug:
@@ -1505,10 +1511,12 @@ def split_types():
             nr_GGA_items = len(gga_msg_lst)
             if nr_GGA_items == 15:
                 t_alt = float(gga_msg_lst[9])
+                if my_debug:
+                    print(TAG+f"t_alt = {t_alt}, type(t_alt)= {type(t_alt)}")
                 p = isinstance(t_alt,float)
                 if p == True:
-                    #                                  alt
-                    t_alt = round(int(float(gga_msg_lst[9])) * 3.2808)
+                    #                 alt
+                    t_alt = round(int(t_alt) * 3.2808)  # convert meters into feet
                 else:
                     t_alt = 0
                 lGPGGA_go = True
@@ -1670,10 +1678,82 @@ def empty_buffer():
     global rx_buffer
     rx_buffer = bytearray(rx_buffer_len * b'\x00')
 
+
+"""
+disp_var(void) -> void
+        This function displays the variation
+        Parameters: None
+        Return: None
+"""    
+def disp_var():
+    TAG = "disp_var(): "
+    var_val = float(my_msgs.read(VAR))  # floating point value
+    print(TAG+f"var_val: {var_val}", end='\n')
+    var_dir = my_msgs.read(VARDIR)
+    tmg_true = get_mag()
+    gr.clear()
+    if var_dir == "E":
+        s1 = "-"
+    elif var_dir == "W":
+        s1 = '+'
+    s2 = "var {:s}{:2d}".format(s1, var_val)
+    scroll_text(s2, False)
+    time.sleep(3)
+
+def get_mag():
+    var_val = float(my_msgs.read(VAR))  # floating point value
+    var_dir = my_msgs.read(VARDIR)
+    tmg_true = float(my_msgs.read(CRS))
+    if var_dir == "E":   # Correct for variation
+        trk_mag = tmg_true - var_val  # NOTE !!! this is the opposite calculation than from magnetic +- variation to true heading
+    elif var_dir == "W":
+        trk_mag = tmg_true + var_val  # idem
+    return trk_mag
+
+"""
+mag_or_tru(void) -> boolean
+        This function discerns if True or Magnetic track will be used
+        Depends on the latitude of the airplane's position 
+        Parameters: None
+        Return: boolean: True if Magnetic. False if True
+"""
+def mag_or_tru():
+    global lMagnetic, lTrackDirChgd
+    lat = float(my_msgs.read(LAT))
+    latdir = my_msgs.read(LATDIR)
+    lMag = True
+        
+    # Note: based on the above mentioned document:
+    if latdir == "N":
+        if lat >= 60.0:
+            lMag = False  # True
+    elif latdir == "S":
+        if lat >= 40.0:
+            lMag = False # True
+    if lMag != lMagnetic:
+        lMagnetic = lMag
+        lTrackDirChgd = True
+    return lMag
+
 def disp_crs():
-    global GPRMC_cnt, loop_time, biLdIsOn
+    global GPRMC_cnt, loop_time, biLdIsOn, lTrackDirChgd
+    
+    """
+        Source: https://www.navcanada.ca/en/changing-from-magnetic-to-true-tracks-in-aviation.pdf
+        At latitudes above about 60° tracks and routes published on charts are
+        given in True because of the weakness of the horizontal component of the magnetic field and
+        because it changes so rapidly with both location and time. 
+        
+        In 2020 position of the magnetic poles:
+        Nortpole: 86.494°N 162.867°E
+        Southpole: 64.081°S 135.866°E
+    """
+ 
     try:
         TAG = "disp_crs(): "
+ 
+        lDispMagOrTru = mag_or_tru()
+    
         #var_val = float(msg_lst[9])  # floating point value
         var_val = float(my_msgs.read(VAR))  # floating point value
         print(TAG+f"var_val: {var_val}", end='\n')
@@ -1688,47 +1768,60 @@ def disp_crs():
         if my_debug:
             print(TAG+"GPRMC_cnt: {}".format(GPRMC_cnt), end="\n")
 
-        msg_lst = my_msgs.read(ALT+1)  # force to receive a list
-        
-        if not my_debug:
+        if my_debug:
+            msg_lst = my_msgs.read(ALT+1)  # force to receive a list
             print(TAG, end='')
-        le = len(msg_lst)
-        if le > 0:
-            if not my_debug:
+            le = len(msg_lst)
+            if le > 0:
                 for _ in range(len(msg_lst)):
                     print("{}, ".format(msg_lst[_]), end='')
                 print()
+            else:
+                print(TAG+"msg_lst is empty!")
 
-            tmg_true = float(msg_lst[tmg])
+        tmg_true = float(my_msgs.read(CRS))
 
-            #ribbon.hub_clear()
-            if var_dir == "E":   # Correct for variation
-                trk_mag = tmg_true - var_val  # NOTE !!! this is the opposite calculation than from magnetic +- variation to true heading
-            elif var_dir == "W":
-                trk_mag = tmg_true + var_val  # idem
-            print(TAG+"track made good true: {}, var {} {}, track magnetcic: {}".format(tmg_true, var_val, var_dir, trk_mag), end='\n')
-            tmg_true = round(tmg_true, 1)
-            trk_mag = round(trk_mag, 1)
-            s_tmg_true = str(tmg_true)
-            s = "CRS " + s_tmg_true + " degs"
-            #if my_debug:
-            print(TAG+s+" (T)")
-            print(TAG+"Time elapsed between uart rx and GU matrix presentation: {:5.2f} in mSecs".format(time_elapsed(loop_time, time.ticks_ms())), end="\n")
-            gr.clear()
-            gr.set_pen(gr.create_pen(int(BACKGROUND_COLOUR[0]), int(BACKGROUND_COLOUR[1]), int(BACKGROUND_COLOUR[2])))
-            # outline_text("airplane parked", x=PADDING - shift, y=2)
-            outline_text("airplane parked", x=1 - shift, y=2)
+        #ribbon.hub_clear()
+        if var_dir == "E":   # Correct for variation
+            trk_mag = tmg_true - var_val  # NOTE !!! this is the opposite calculation than from magnetic +- variation to true heading
+        elif var_dir == "W":
+            trk_mag = tmg_true + var_val  # idem
+        if trk_mag >= 360.0:
+            trk_mag -= 360.0
+        
+        print(TAG+"track made good true: {}, var {} {}, track magnetcic: {}".format(tmg_true, var_val, var_dir, trk_mag), end='\n')
+        tmg_true = round(tmg_true, 1)
+        s_tmg_true = str(tmg_true)
+        trk_mag = round(trk_mag, 1)
+        s_trk_mag = str(trk_mag)
+        if lDispMagOrTru:
+            s = "TRACK " + s_trk_mag + " degs (M)"
+        else:
+            s = "TRACK " + s_tmg_true + " degs (T)"
+        #if my_debug:
+        print(TAG+s)
+        print(TAG+"Time elapsed between uart rx and GU matrix presentation: {:5.2f} in mSecs".format(time_elapsed(loop_time, time.ticks_ms())), end="\n")
 
+        if lDispMagOrTru:
+            ribbon.set_heading_fm_sim(trk_mag)
+        else:
             ribbon.set_heading_fm_sim(tmg_true)
 
-            gr.clear()
-            gr.set_pen(gr.create_pen(int(BACKGROUND_COLOUR[0]), int(BACKGROUND_COLOUR[1]), int(BACKGROUND_COLOUR[2])))
-            ribbon.ribbon_base()
-            s = "HDG:"+s_tmg_true
-            if biLdIsOn:
-                led_toggle()
-        else:
-            print(TAG+"msg_lst is empty!")
+        gr.clear()
+        if startup == -1 or lTrackDirChgd:
+            lTrackDirChgd = False # reset flag
+            if lDispMagOrTru:
+                scroll_text("TRK: MAG", False)
+            else:
+                scroll_text("TRK: TRUE", False)
+            time.sleep(2)
+            gr.clear
+        gr.set_pen(gr.create_pen(int(BACKGROUND_COLOUR[0]), int(BACKGROUND_COLOUR[1]), int(BACKGROUND_COLOUR[2])))
+        ribbon.ribbon_base()
+
+        if biLdIsOn:
+            led_toggle()
+
     except KeyboardInterrupt:
         return False
     return True
@@ -1896,4 +1989,5 @@ if __name__ == '__main__':
     main(False)
 
 # ----- END-OF-SKETCH -----
+
 

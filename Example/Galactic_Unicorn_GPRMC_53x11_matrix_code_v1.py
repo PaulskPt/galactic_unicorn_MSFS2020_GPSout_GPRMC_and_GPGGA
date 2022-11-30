@@ -1716,6 +1716,16 @@ mag_or_tru(void) -> boolean
         Depends on the latitude of the airplane's position 
         Parameters: None
         Return: boolean: True if Magnetic. False if True
+        
+        Source: https://www.navcanada.ca/en/changing-from-magnetic-to-true-tracks-in-aviation.pdf
+        At latitudes above about 60° tracks and routes published on charts are
+        given in True because of the weakness of the horizontal component of the magnetic field and
+        because it changes so rapidly with both location and time. 
+        
+        Next info added by @Paulskpt. Also decision to use True in the Southern hemisphere from and above latitude 40°
+        In 2020 position of the magnetic poles:
+        Nortpole: 86.494°N 162.867°E
+        Southpole: 64.081°S 135.866°E
 """
 def mag_or_tru():
     global lMagnetic, lTrackDirChgd
@@ -1737,17 +1747,6 @@ def mag_or_tru():
 
 def disp_crs():
     global GPRMC_cnt, loop_time, biLdIsOn, lTrackDirChgd
-    
-    """
-        Source: https://www.navcanada.ca/en/changing-from-magnetic-to-true-tracks-in-aviation.pdf
-        At latitudes above about 60° tracks and routes published on charts are
-        given in True because of the weakness of the horizontal component of the magnetic field and
-        because it changes so rapidly with both location and time. 
-        
-        In 2020 position of the magnetic poles:
-        Nortpole: 86.494°N 162.867°E
-        Southpole: 64.081°S 135.866°E
-    """
  
     try:
         TAG = "disp_crs(): "

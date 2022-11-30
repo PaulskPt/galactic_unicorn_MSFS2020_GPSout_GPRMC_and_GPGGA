@@ -108,20 +108,21 @@ button_lux_dn = machine.Pin(gu.SWITCH_BRIGHTNESS_DOWN, machine.Pin.IN, machine.P
 button_rst = machine.Pin(gu.SWITCH_SLEEP, machine.Pin.IN, machine.Pin.PULL_UP)
 
 func_dict = {
-    0: "pos_func",
-    1: "gs_func",
-    2: "crs_func", 
+    0: "crs_func", 
+    1: "pos_func",
+    2: "gs_func",
     3: "alt_func"
 }
 
 func_rev_dict = {
-    "pos_func": 0,
-    "gs_func": 1,
-    "crs_func": 2,
+    "crs_func": 0,
+    "pos_func": 1,
+    "gs_func": 2,
     "alt_func": 3
 }
 
-curr_func = 2  # default function = disp_crs()
+curr_func = 0  # default function = disp_crs()
+old_func = curr_func
 
 brill = 100 # Using brill to make default brilliance less strong
 
@@ -412,7 +413,6 @@ def handle_rst(pin):
 def handle_a(pin):
     global curr_func, button_a_pressed
     if button_a_pressed:
-        button_a_pressed = False
         return # prevent handle bounce
     else:
         button_a_pressed = True
@@ -425,7 +425,6 @@ def handle_a(pin):
 def handle_b(pin):
     global curr_func, button_b_pressed
     if button_b_pressed:
-        button_b_pressed = False
         return # prevent handle bounce
     else:
         button_b_pressed = True
@@ -1054,7 +1053,7 @@ def is_ac_taxying(show_speed=False):
 
 def loop():
     global startup, led, lp_cnt, ID_s, lstop, previousMillis, led_interval, biLdIsOn, gs_item, gs_old, t_parked_init, \
-    biLdIsOn, msg_nr, rx_buffer, msg_lst, nr_msg_items, my_platform, dh_left, dh_hdg_row_lst, width
+    biLdIsOn, msg_nr, rx_buffer, msg_lst, nr_msg_items, my_platform, dh_left, dh_hdg_row_lst, width, old_func
 
 
     TAG = "loop(): "
@@ -1133,6 +1132,7 @@ def loop():
                             if startup == -1:
                                 gr.clear()
                             t_parked_init = 0.0
+                            time.sleep(0.1)  # give a break to handle interrupts
                             #led_toggle()  # we toggle elsewhere (when receiving msg in ck_uart() )
                             if func_dict[curr_func] == "crs_func":
                                 if not disp_crs():
@@ -1146,6 +1146,9 @@ def loop():
                             if func_dict[curr_func] == "alt_func":
                                 if not disp_alt():
                                     return False
+                            if old_func != curr_func:
+                                old_func = curr_func
+                                clr_buttons()
                             #lcd_pr_msgs()
                             gc.collect()
                         startup = 0
@@ -1887,7 +1890,7 @@ def disp_gs():
 
 def disp_alt():
     TAG="disp_alt(): "
-    t_alt = "{:s} FT".format(my_msgs.read(ALT)) # ALT is an integer
+    t_alt = "A {:s} FT".format(my_msgs.read(ALT)) # ALT is an integer
     gr.clear()
     gr.set_pen(WHITE)
     #outline_text("Disp ALT", 4, 2)

@@ -91,6 +91,11 @@ use_sound = False
 gu = GalacticUnicorn()
 gr = PicoGraphics(display=DISPLAY_GALACTIC_UNICORN)
 
+button_a_pressed = False 
+button_b_pressed = False
+button_c_pressed = False
+button_d_pressed = False
+
 button_a = machine.Pin(gu.SWITCH_A, machine.Pin.IN, machine.Pin.PULL_UP)
 button_b = machine.Pin(gu.SWITCH_B, machine.Pin.IN, machine.Pin.PULL_UP)
 button_c = machine.Pin(gu.SWITCH_C, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -405,16 +410,25 @@ def handle_rst(pin):
         machine.reset()
         
 def handle_a(pin):
-    global curr_func
+    global curr_func, button_a_pressed
+    if button_a_pressed:
+        button_a_pressed = False
+        return # prevent handle bounce
+    else:
+        button_a_pressed = True
     le = len(func_dict)
     curr_func += 1
     if curr_func >= le:
         curr_func = 0
     print(f"handle_a(): new curr_func = {curr_func} (\'{func_dict[curr_func]}\')")
 
-
 def handle_b(pin):
-    global curr_func
+    global curr_func, button_b_pressed
+    if button_b_pressed:
+        button_b_pressed = False
+        return # prevent handle bounce
+    else:
+        button_b_pressed = True
     le = len(func_dict)
     curr_func -= 1
     if curr_func < 0:
@@ -422,11 +436,27 @@ def handle_b(pin):
     print(f"handle_b(): new curr_func = {curr_func} (\'{func_dict[curr_func]}\')")
 
 def handle_c(pin):
+    global button_c_pressed
+    if button_c_pressed:
+        return # prevent handle bounce
+    else:
+        button_c_pressed = True
     pass
 
 def handle_d(pin):
+    global button_d_pressed
+    if button_d_pressed:
+        return # prevent handle bounce
+    else:
+        button_d_pressed = True
     pass
 
+def clr_buttons():
+    global button_a_pressed, button_b_pressed, button_c_pressed, button_d_pressed
+    button_a_pressed = False
+    button_b_pressed = False
+    button_c_pressed = False
+    button_d_pressed = False
 
 def handle_lux_up(pin):
      gu.adjust_brightness(+0.01)
@@ -1826,23 +1856,43 @@ def disp_crs():
     return True
 
 def disp_pos():
+    TAG="disp_pos(): "
+    lat = float(my_msgs.read(LAT))
+    latdir = my_msgs.read(LATDIR)
+    lon = float(my_msgs.read(LON))
+    londir = my_msgs.read(LONDIR)
+    s1 = "{:5.2f} {:s}".format(lat, latdir)
+    s2 = "{:5.2f} {:s}".format(lon, londir)
     gr.clear()
     gr.set_pen(WHITE)
-    outline_text("Disp POS", 4, 2)
-    time.sleep(3)
+    print(TAG+"Pos= {s1}/{s2}")
+    scroll_text(s1, False)
+    time.sleep(2)
+    gr.clear()
+    print(TAG+s2)
+    scroll_text(s2, False)
+    time.sleep(2)
     return True
 
 def disp_gs():
+    TAG= "disp_gs(): "
+    t_gs = "GS {:d} KT".format(int(ck_gs()))
     gr.clear()
     gr.set_pen(WHITE)
-    outline_text("Disp GS", 4, 2)
+    #outline_text("Disp GS", 4, 2)
+    print(TAG, t_gs)
+    scroll_text(t_gs, False)
     time.sleep(3)
     return True
 
 def disp_alt():
+    TAG="disp_alt(): "
+    t_alt = "{:s} FT".format(my_msgs.read(ALT)) # ALT is an integer
     gr.clear()
     gr.set_pen(WHITE)
-    outline_text("Disp ALT", 4, 2)
+    #outline_text("Disp ALT", 4, 2)
+    print(TAG+f"ALT= ", t_alt)
+    scroll_text(t_alt, False)
     time.sleep(3)
     return True
 
@@ -1988,5 +2038,6 @@ if __name__ == '__main__':
     main(False)
 
 # ----- END-OF-SKETCH -----
+
 
 

@@ -73,8 +73,9 @@ Reset:
 The script uses the Zzz button of the Galactic Unicorn (on the right side of the board in the middle) to reset the microcontroller.
 
 IMPORTANT NOTE:
-    Only connect the SDA, SCL and GND wires of the Galactic Unicorn I2C (#1 or #2) have to
-    be connected to the USB-to-serial connector device, e.g. a CP2102N.
+
+    Only connect the SDA, SCL and GND wires of the Galactic Unicorn I2C connector (#1 or #2)
+    to the USB-to-serial connector device, e.g. a CP2102N.
     Do not connect the I2C red wire from the Galactic Unicorn to the +3V pin of the USB-to-serial converter device. 
     Connecting the red wire will prevent the Galactic Unicorn to reset properly:
     - MS Windows e.g. will report an error that the connected USB device has not been recognized;

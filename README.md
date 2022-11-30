@@ -36,11 +36,12 @@ From the filtered GPRMC GPS datagram message this project uses the airplane's po
 In this moment only th flown track is shown on the LED matrix display.  When the groundspeed value is > 0.2 and <= 30 kts, the airplane is assumed to be taxying. If the groundspeed is 0, during a short period, the airplane is assumed to be stopped or parked. The states: 'ac parked' and 'taxying' are shown on the LED matrix display. As soon as the groundspeed exceeds 30 kts the flown track will be displayed onto the LED matrix display of the Galactic Unicorn.
 
 This is a work-in-progress.
-In later updates also other GPS data will become available to be displayed on the Galactic Unicorn:
+Using button_a and button_b we can cycle up or down through the available items to be displayed:
 ```
+- Track;
 - Latitude/Longitude;
-- Altitude;
-- Groundspeed.
+- Groundspeed;
+- Altitude
 ```
 
 NOTE: The baudrate is set to 4800 baud (inside the FSUIPC7 > GPSout > 1 (or > 2). There, also select the correct COM-port for MS Windows 11)

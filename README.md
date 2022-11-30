@@ -71,9 +71,14 @@ b) check FSUIPC7 (Alt-F) menu `Options`, Item `GPS Out...`. Eventually exit (men
 Reset:
 
 The script uses the Zzz button of the Galactic Unicorn (on the right side of the board in the middle) to reset the microcontroller.
-When you use this button be sure to disconnect the red wire of the I2C connection from the 3V pin of the CP2102N, otherwise in the Thonny
-IDE the 'stop/restart' button will not work and you will not be able to reach files on the board's filesystem. After you successfully
-pressed the 'stop/restart' button in Thonny, you can re-connect the I2C red wire to the 3V pin of the CP2102N.
+
+IMPORTANT NOTE:
+    Only connect the SDA, SCL and GND wires of the Galactic Unicorn I2C (#1 or #2) have to
+    be connected to the USB-to-serial connector device, e.g. a CP2102N.
+    Do not connect the I2C red wire from the Galactic Unicorn to the +3V pin of the USB-to-serial converter device. 
+    Connecting the red wire will prevent the Galactic Unicorn to reset properly:
+    - MS Windows e.g. will report an error that the connected USB device has not been recognized;
+    - The Thonny IDE 'stop/restart' button will not work and you will not be able to reach files on the board's filesystem.
 
 I used the Mu-editor app to save, edit and test the script file: ```code.py```. I also used VSCode to find bugs and to copy the list of variables and functions.
 

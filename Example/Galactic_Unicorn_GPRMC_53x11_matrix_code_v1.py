@@ -37,6 +37,14 @@
     and here in this script both are set for 4800 baud.
     
     Clock synchronizes time on start.
+        
+    Update 2022-11-30:
+    IMPORTANT NOTE:
+    Do not connect the I2C red wire from the Galactic Unicorn to the +3V pin of the USB-to-serial
+    converter device. This will prevent the Galactic Unicorn to reset properly.
+    MS Windows e.g. will report an error that the connected USB device has not been recognized.
+    Only connect the SDA, SCL and GND wires of the Galactic Unicorn I2C (#1 or #2) have to
+    be connected to the USB-to-serial connector device, e.g. a CP2102N.
 
 """
 import gc
@@ -1747,6 +1755,39 @@ def disp_alt():
     return True
 
 """
+intro(lIntroShown, lSyncTime) -> void
+        This function is called by main()
+        Parameter: boolean: lIntroShown.  Flag to signal that the intro messages have been displayed
+        Parameter: boolean: lSyncTime. Flag to call sync_time() or not
+        Return: boolean: lIntroShown
+"""
+def intro(intro_shown, lSyncTime):
+    if not intro_shown:
+        intro_shown = True
+        gr.clear()
+        scroll_text("MSFS 2020", False)
+        time.sleep(3)
+        gr.clear()
+        scroll_text("GPS RX", False)
+        if lSyncTime:
+            sync_time(False)  # get NTP time
+        else:
+            time.sleep(3)
+        gr.clear()
+        year, month, day, wd, hour, minute, second, _ = rtc.datetime()
+        ymd = "{:04} {:02} {:02}".format(year, month, day)
+        hms = "{:02} {:02} {:02}".format(hour, minute, second)
+
+        # Year / Month / Day
+        ribbon.draw_number(8, 6, ymd)
+        time.sleep(3)
+        
+        # Hour / Minute / Second
+        ribbon.draw_number(1, 1, hms) 
+        time.sleep(4)
+    return intro_shown
+
+"""
 main(void) -> void
         This is the start function
         Parameters: None
@@ -1757,7 +1798,7 @@ def main(Slow):
     TAG = "main(): "
     lStart = True
     lUpdate = False
-    ymd_shown = False
+    intro_shown = False
 
     # ----------------------------------------------+
     # Settings for Galactic Unicorn
@@ -1774,7 +1815,10 @@ def main(Slow):
     led.toggle()
     biLdIsOn = False
     
-    sync_time(False)  # get NTP time
+    if not intro_shown:
+        intro_shown = intro(intro_shown, True) 
+
+    #sync_time(False)  # get NTP time
     
     if Slow:
         MESSAGE = "              MSFS 2020 GPRMC AND GPGGA GPS MESSAGES RX FOR PIMORONI\'S GALACTIC UNICORN                           "
@@ -1795,21 +1839,7 @@ def main(Slow):
             t = time.ticks_ms()
             
             gr.clear()
-            
-            if not ymd_shown:
-                ymd_shown = True
-                year, month, day, wd, hour, minute, second, _ = rtc.datetime()
-                ymd = "{:04} {:02} {:02}".format(year, month, day)
-                hms = "{:02} {:02} {:02}".format(hour, minute, second)
-
-                # Year / Month / Day
-                ribbon.draw_number(8, 6, ymd)
-                time.sleep(3)
-                
-                # Hour / Minute / Second
-                ribbon.draw_number(1, 1, hms) 
-                time.sleep(4)
-
+    
             # ----------FROM SCROLLING-TEXT SCRIPT FOR GALACTIC UNICORN ------------------------------------+
             time_now = time.ticks_ms()
             time_delta = time_now - time_last

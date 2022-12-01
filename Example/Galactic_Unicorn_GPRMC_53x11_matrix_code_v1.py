@@ -108,20 +108,20 @@ button_lux_dn = machine.Pin(gu.SWITCH_BRIGHTNESS_DOWN, machine.Pin.IN, machine.P
 button_rst = machine.Pin(gu.SWITCH_SLEEP, machine.Pin.IN, machine.Pin.PULL_UP)
 
 func_dict = {
-    0: "crs_func", 
-    1: "pos_func",
-    2: "gs_func",
+    0: "pos_func",
+    1: "gs_func",
+    2: "crs_func", 
     3: "alt_func"
 }
 
 func_rev_dict = {
-    "crs_func": 0,
-    "pos_func": 1,
-    "gs_func": 2,
+    "pos_func": 0,
+    "gs_func": 1,
+    "crs_func": 2,
     "alt_func": 3
 }
 
-curr_func = 0  # default function = disp_crs()
+curr_func = 2  # default function = disp_crs()
 old_func = curr_func
 
 brill = 100 # Using brill to make default brilliance less strong
@@ -413,6 +413,7 @@ def handle_rst(pin):
 def handle_a(pin):
     global curr_func, button_a_pressed
     if button_a_pressed:
+        #button_a_pressed = False
         return # prevent handle bounce
     else:
         button_a_pressed = True
@@ -425,6 +426,7 @@ def handle_a(pin):
 def handle_b(pin):
     global curr_func, button_b_pressed
     if button_b_pressed:
+        #button_b_pressed = False
         return # prevent handle bounce
     else:
         button_b_pressed = True
@@ -512,7 +514,7 @@ if use_sound:
             text = "Vol Dn"+' '+str(vol)
             gr.set_pen(gr.create_pen(0, 0, 0))
             gr.clear()
-            outline_text(text)
+            outline_text(text, cnt=0)
 
     def play_tone(tone):
         global vol
@@ -597,7 +599,7 @@ def scroll_text(msg, do_scroll):
         gr.clear()
 
         #outline_text(msg, x=PADDING - shift, y=2)
-        outline_text(msg, x=PADDING - shift, y=2)
+        outline_text(msg, x=PADDING - shift, y=2, cnt=cnt)
 
         # update the display
         gu.update(gr)
@@ -656,11 +658,12 @@ def gradient_background(start_hue, start_sat, start_val, end_hue, end_sat, end_v
         gr.pixel(half_width, y)
 
 # function for drawing outlined text
-def outline_text(text, x, y, alt_clr=(255,255,255)):
+def outline_text(text, x, y, alt_clr=(255,255,255), cnt=0):
     #gr.set_font("bitmap6")  #"bitmap8")
+
     if x < 0:
         x = -x  # make it positive
-    if not my_debug:
+    if not my_debug and cnt == 0:
         print(f"outline_text(): text = \'{text}\', x,y = {x},{y}")
     #gr.set_pen(gr.create_pen(alt_clr[0], alt_clr[1], alt_clr[2]))
     gr.set_pen(WHITE)
@@ -790,7 +793,7 @@ def redraw_display_if_reqd():
         x = int(width / 2 - w / 2 + 1)
         y = 2
 
-        outline_text(clock, x, y)
+        outline_text(clock, x, y, cnt=0)
 
         last_second = second
 
@@ -911,8 +914,8 @@ class HdgRibbon():
                 x = 36
             gc.collect()
             gr.set_pen(gr.create_pen(fg[0], fg[1], fg[2]))
-            #outline_text(h_lst[idx], self.h_pts[_] - s_width + x_comp, y, fg)
-            #outline_text(h_lst[idx], x, y, fg)
+            #outline_text(h_lst[idx], self.h_pts[_] - s_width + x_comp, y, fg, cnt=0)
+            #outline_text(h_lst[idx], x, y, fg, cnt=0)
             gr.text(h_lst[idx], x, y, -1, 1)
 
         gu.update(gr)
@@ -1018,7 +1021,7 @@ def is_ac_stopped():
             if lacStopMsgShown == False:
                 # It takes about ten seconds before this message is shown after aircraft is stopped
                 scroll_text("ac parked   ", False)
-                #outline_text("ac parked",2,2)
+                #outline_text("ac parked",2,2, cnt=0)
                 lacStopMsgShown = True
             print(s, end = '\n') # Alway print to REPL (it does almost immediately)
     return lac_Stopped
@@ -1070,7 +1073,7 @@ def loop():
     currentMillis = ticks_ms()
     s = "board " + my_platform+" "
     gr.set_pen(WHITE)
-    outline_text(s, x=3, y=2)
+    outline_text(s, x=3, y=2, cnt=0)
     print(s)
     sleep_for = 5
     time.sleep(3)
@@ -1543,6 +1546,8 @@ def split_types():
             gga_msg_lst = sGGA.split(",")
             nr_GGA_items = len(gga_msg_lst)
             if nr_GGA_items == 15:
+                if my_debug:
+                    print(TAG+f"type(gga_msg_lst[9])= {type(gga_msg_lst[9])}, value= {gga_msg_lst[9]}")
                 t_alt = float(gga_msg_lst[9])
                 if my_debug:
                     print(TAG+f"t_alt = {t_alt}, type(t_alt)= {type(t_alt)}")
@@ -1882,7 +1887,7 @@ def disp_gs():
     t_gs = "GS {:d} KT".format(int(ck_gs()))
     gr.clear()
     gr.set_pen(WHITE)
-    #outline_text("Disp GS", 4, 2)
+    #outline_text("Disp GS", 4, 2, cnt=0)
     print(TAG, t_gs)
     scroll_text(t_gs, False)
     time.sleep(3)
@@ -1893,7 +1898,7 @@ def disp_alt():
     t_alt = "A {:s} FT".format(my_msgs.read(ALT)) # ALT is an integer
     gr.clear()
     gr.set_pen(WHITE)
-    #outline_text("Disp ALT", 4, 2)
+    #outline_text("Disp ALT", 4, 2, cnt=0)
     print(TAG+f"ALT= ", t_alt)
     scroll_text(t_alt, False)
     time.sleep(3)

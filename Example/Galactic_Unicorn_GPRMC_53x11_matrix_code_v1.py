@@ -21,12 +21,16 @@
     Now ck_uart tries to read a full line through uart.readline()
     If this gives an error "NoneType has no attribute 'readline()'
     ck_uart will try c = uart.read() and then if a character has been received.
-    The data received is a bytearray. This bytearray is converted into a text buffer (rx_buffer).
+    The data received is a bytearray. This bytearray is converted into a text buffer (rx_buffer_s).
     
-    Next the received GPS datagram will be split into twelve data items, saved as a msg_lst list.
-    In this project we only will use the Groundspeed data item and the 'track made good' data item.
-    The groundspeed data is used to discern if the airplane is moving or not. When moving, the LED
-    panel will display the track. When the airplane is stopped or parked, the LED panel will be OFF.
+    Next the received GPRMC GPS datagram will be split into twelve data items, saved as a GPRMC_lst list.
+    The received GPGGA GPS datagram will be split into fifteen data items, saved as a GPGGA_lst list.
+    The groundspeed data is used to discern if the airplane is moving or not. 
+    When the groundspeed is zero, the text 'A/C Parked' is displayed. When the groundspeed is between
+    0.2 and 30 KTS the text 'taxying' is displayed. Above a groundspeed of 30 KTS the flown track,
+    the airplane's position, the groundspeed or the altitude will be displayed, depending the choice
+    the user made, using the A or B button.
+  
     
     Update 2022-07-23.
     Updated the micropython firmware to v1.19
@@ -128,12 +132,6 @@ brill = 100 # Using brill to make default brilliance less strong
 
 gc.enable() # Enable autmatic garbage collection
 
-max_bytes = 256 # was: 160 en daarvoor: 2**5  = 2<<5 = 64
-rx_buffer_len = max_bytes
-rx_buffer = bytearray(rx_buffer_len * b'\x00')
-rx_buffer_s = ''
-
-dh_left = 10
 
 width = gu.WIDTH
 height = gu.HEIGHT
@@ -142,54 +140,27 @@ lcd_maxrows = height-1
 
 rtc = None
 
-s_ymd = s_wd = s_hms = None
-
-dow_lst = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-font_small = 0   # 0 = font8x12, 1 = font10x14
-font_large = 1
-
-set_hsv = 0  # was: hub.set_hsv
-set_rgb = 0  # was: hub.set_rgb
-
-dh_row_lst = [0, 9, 18, 27]
-dh_hdg_row_lst = [14,23]
 ribbon = None
-
-# +--------------------------------------------------+
-# | Definitions for 320x240 Displayhat mini display  |
-# +--------------------------------------------------+
-my_platform = sys.platform # for the Pi Pico the value is: 'RP2040'
-
-# dh_rowlen = WIDTH
-dh_rowlen = width
-dh_maxrows = 8
-dh_black = (0, 0, 0)
-dh_white = (255, 255, 255)
 
 # +----------------------+
 # | Definition for I2C   |
 # +----------------------+
-#I2C_SDA = Pin(4, Pin.OUT)  # i2c sda
-#I2C_SCL = Pin(5, Pin.IN, Pin.PULL_UP) # i2c scl
 try:
-    #PINS_GC = {"sda": I2C_SDA, "scl": I2C_SCL}  # i2c Pins for Galactic Unicorn (RPi Pico W)
     PINS_GC = {"sda": 4, "scl": 5}  # i2c Pins for Galactic Unicorn (RPi Pico W)
     i2c = PimoroniI2C(**PINS_GC)
 except Exception as e:
     print("Error while creating i2c object", e)
-# end of imports for the Interstate 75
+
 # +----------------------+
 # | Definition for UART  |
 # +----------------------+
 # 
 # via a TTL-to-USB converter connected to desktop PC Paul1 (COM9)
 #
-
 try:
     uart = UART(1, 4800)
 
-    # wait a minimum amount of time before trying to read the sensor
+    # wait a minimum amount of time before trying to read the device
     sleep(0.25)
 except ValueError:  # e.g.: "bad TX pin"
     uart = None
@@ -207,10 +178,6 @@ if sys.version_info > (3,): # Checked 2101-06-02: sys.version_info results in: (
 
 ID_s = "" # The datagram ID e.g. GPRMC
 
-# BI_LED_R = 16 # RGB LED
-# BI_LED_G = 17 # idem
-# BI_LED_B = 18 # idem
-
 led = machine.Pin(25, machine.Pin.OUT)  # The led of the RPi Pico is just a mono light
 
 led_interval = 1000
@@ -223,34 +190,32 @@ loop_time = 0
 # Message serial nr
 msg_nr = 0
 nRMC = None
-rmc_lst = []
 nGGA = None
 GPRMC_cnt = 0
+GPRMC_lst = []
+GPGGA_lst = []
+le_GPRMC_lst = 0
+le_GPGGA_lst = 0
 nr_msg_items = 0
-gs_item = 6 # Note the '$GPRMC' item is not counted
-# tmg =  7 # see disp_crs()
+
+ac_no_data = 0
+ac_stopped = 1
+ac_taxying = 2
+ac_flying = 3
+ac_stat = ac_stopped
 
 # next four defs copied from:
 # I:\pico\paul_projects\pico\circuitpython\msfs2020_gps_rx_picolipo\2021-09-03_16h49_ver
-lacNoDataMsgShown = False
-lac_Stopped = True
-lacStopMsgShown = False
-lacTaxyMsgShown = False
-acStopInitMonot = 0
-acStopInterval = 6000 # mSec
-lac_Taxying = False
-lacTaxyMsgShown = False
 lMagnetic = True
 lTrackDirChgd = False
 v_gs = 0
 
 gs_old = 0.0
-ac_parked = True
-t_parked_init = 0.0
 max_text_len = 25
 # Buffers
-rx_buffer_len = 120
-rx_buffer = ""
+rx_buffer_len = 256 # was: 160 en daarvoor: 2**5  = 2<<5 = 64. Also used: 120
+rx_buffer = bytearray(rx_buffer_len * b'\x00')
+rx_buffer_s = ''
 msg_lst = [] # Create an empty message list. Will later be filled with the GPRMC message parts splitted
 s_telapsed = "Time elapsed between uart rx and GU matrix presentation: "
 
@@ -803,7 +768,7 @@ gu.set_brightness(0.2)  # was: (0.5)
 
 class HdgRibbon():
     def __init__(self):
-        global width, height, set_hsv, set_rgb
+        global width, height
         if my_debug:
             print("HdgRibbon.__init__(): we passed here")
         self.clr = 155
@@ -942,9 +907,12 @@ class HdgRibbon():
     def led_toggle(): # (void)
     def reset():  # (void)
     def ck_gs(): # (float)
-    def is_ac_stopped(void) # (bool)
-    def is_ac_taxying(show_speed) # (bool)
-    def lcd_pr_msgs() # void
+    def ac_is_stopped(void) # (bool)
+    def ac_is_taxying(show_speed) # (bool)
+    def disp_crs() # (void)
+    def disp_pos() # (void)
+    def disp_gs() # (void)
+    def disp_alt() # (void)
     def loop(): # (void)
     def main():
 """
@@ -969,110 +937,79 @@ def ck_gs():
         print(TAG,"value of v_gs = {}".format(v_gs), end='\n')
     return v_gs
 
-
 def nodata():
-    global lacNoDataMsgShown
+    global ac_stat
     TAG= "nodata()"
     s = "no data"
-    lac_Stopped = False
-    lac_Taxying = True
-    lac_Stopped = False
-    lacStopMsgShown = False
-    if lacNoDataMsgShown == False:   
-        scroll_text(s, False) # *max_text_len
-        lacNoDataMsgShown = True
+    if ac_stat != ac_no_data:
+        ac_stat = ac_no_data
+    scroll_text(s, False)
     print(TAG+s)
+    
+def ac_status():
+    global ac_stat, v_gs
+    TAG= "ac_status(): "
+    stats_dict = {
+        ac_no_data: "no data",
+        ac_stopped: "parked",
+        ac_taxying: "taxying",
+        ac_flying: "flying"
+    }
+    v_gs = ck_gs()
+    if v_gs < 0.2:
+        ac_stat = ac_stopped
+    elif v_gs >= 0.2 and v_gs <= 30:  # keep margin. Sometimes while parked the gs can be 0.1
+        ac_stat = ac_taxying
+    elif v_gs > 30:
+        ac_stat = ac_flying
+    if not my_debug:
+        if ac_stat >= ac_no_data and ac_stat <= ac_flying:
+            print(TAG+f"airplane is {stats_dict[ac_stat]}")
    
 """
  Function copied from: I:\pico\paul_projects\pico\circuitpython\msfs2020_gps_rx_picolipo\2021-09-03_16h49_ver
 """
-def is_ac_stopped():
-    global lac_Stopped, lacStopMsgShown, lac_Taxying, lacTaxyMsgShown, acStopInitMonot, acStopInterval, v_gs, my_msgs
-    TAG = "is_ac_stopped(): "
+
+def ac_is_stopped():
+    global ac_stat 
+    TAG = "ac_is_stopped(): "
     s = "Aircraft is stopped or parked"
-    #gs = 5
     t_elapsed = 0
-    lelapsed = False
-    v_gs = ck_gs()
-    if v_gs == 0:
-        lac_Stopped = True
-    else:
-        lac_Stopped = False
-        lacStopMsgShown = False
-        acStopInitMonot = 0
-        return lac_Stopped
+    lelapsed = True
+    if ac_stat == ac_stopped:
+        scroll_text("ac parked", False)
+        print(s, end = '\n') # Alway print to REPL (it does almost immediately)
 
-    if lac_Stopped == True:
-        currMonot = time.time_ns()
-        if acStopInitMonot == 0:
-            acStopInitMonot = currMonot
 
-        t_elapsed = (((currMonot - acStopInitMonot) + 500000)// 1000000)
-        if my_debug:
-            print(TAG,"t_elapsed:{}. acStopInterval: {}".format(t_elapsed, acStopInterval), end='\n')
-
-        if t_elapsed >= acStopInterval:
-            lelapsed = True
-
-        if not my_debug:
-            print(TAG,"lelapsed:{}. lacStopMsgShown: {}".format(lelapsed, lacStopMsgShown), end='\n')
-        if lac_Taxying or lelapsed:  # When from taxying to stopped, don't wait
-            lac_Taxying = False
-            lacTaxyMsgShown = False
-            if lacStopMsgShown == False:
-                # It takes about ten seconds before this message is shown after aircraft is stopped
-                scroll_text("ac parked   ", False)
-                #outline_text("ac parked",2,2, cnt=0)
-                lacStopMsgShown = True
-            print(s, end = '\n') # Alway print to REPL (it does almost immediately)
-    return lac_Stopped
-
-def is_ac_taxying(show_speed=False):
-    global lac_Stopped, lac_Taxying, lacStopMsgShown, lacTaxyMsgShown, v_gs
-    TAG= "is_ac_taxying(): "
+def ac_is_taxying(show_speed=False):
+    global ac_stat
+    TAG= "ac_is_taxying(): "
     s = "Airplane is taxying"
-    v_gs = ck_gs()
-    print(TAG+f"v_gs= {v_gs}")
-    if v_gs > 0.2 and v_gs <= 30.0:  # keep margin. Sometimes while parked the gs can be 0.1
-        lac_Stopped = False
-        lac_Taxying = True
-        lac_Stopped = False
-        lacStopMsgShown = False
-        if lacTaxyMsgShown == False:
-            if not show_speed:
-                s = "taxying"
-            else:
-                s = 'Speed {} kts'.format(v_gs)    
-            scroll_text(s, False) # *max_text_len
-            #utline_text(s, 2, 2)
-            
-            lacTaxyMsgShown = True
+    if ac_stat == ac_taxying: 
+        if not show_speed:
+            s = "taxying"
+        else:
+            s = 'Speed {} kts'.format(v_gs)    
+        scroll_text(s, False)
         print(TAG+s)
-    else:
-        lac_Taxying = False
-        lacTaxyMsgShown = False
-        # t_parked_init = 0.0
-        #led_toggle()  # we toggle elsewhere
-    return lac_Taxying
+
 
 def loop():
-    global startup, led, lp_cnt, ID_s, lstop, previousMillis, led_interval, biLdIsOn, gs_item, gs_old, t_parked_init, \
-    biLdIsOn, msg_nr, rx_buffer, msg_lst, nr_msg_items, my_platform, dh_left, dh_hdg_row_lst, width, old_func
+    global startup, led, lp_cnt, ID_s, lstop, previousMillis, led_interval, biLdIsOn, gs_old, \
+    biLdIsOn, msg_nr, rx_buffer, msg_lst, nr_msg_items, width, old_func
 
 
     TAG = "loop(): "
     chrs_rcvd = 0  # (int) holds the number of characters received via the serial communication line
     c = 0  # (unsigned char)
     
-    # gs_item = 6
     gs = 0.0
     gs_old = 0.0
-    t_parked_init = 0.0
     msg_rx_ok = 0
 
     # currentMillis (See Adafruit: 'time in CircuitPython')
     currentMillis = ticks_ms()
-    s = "board " + my_platform+" "
+    s = "board " + sys.platform+" " # for the Pi Pico the value is: 'RP2040'
     gr.set_pen(WHITE)
     outline_text(s, x=3, y=2, cnt=0)
     print(s)
@@ -1124,41 +1061,41 @@ def loop():
                     #  print the rx_buffer less the \r\n at the end
                     #print(TAG+"Msg nr: {}, ID: {}, characters rcvd from ck_uart() is: {}, contents: \n\"{}\"".format(msg_nr,
                     #    ID_s, chrs_rcvd, rx_buffer[:-2]), file=sys.stderr)
-                lResult = split_types()
-                print(TAG+"split_types() result = {}".format(lResult))
+                lResult = add_data()
+                print(TAG+"add_data() result = {}".format(lResult))
                 if lResult:
+                    ac_status() # Get the airplane's status: no_data, stopped, taxying or flying
                     msg_rx_ok += 1
-                    if not is_ac_stopped():
-                        if is_ac_taxying(False):
-                            lacTaxyMsgShown = False
-                            #startup = 0
-                        else:
-                            if startup == -1:
-                                gr.clear()
-                            t_parked_init = 0.0
-                            time.sleep(0.1)  # give a break to handle interrupts
-                            #led_toggle()  # we toggle elsewhere (when receiving msg in ck_uart() )
-                            if func_dict[curr_func] == "crs_func":
-                                if not disp_crs():
-                                    return False
-                            if func_dict[curr_func] == "pos_func":
-                                if not disp_pos():
-                                    return False
-                            if func_dict[curr_func] == "gs_func":
-                                if not disp_gs():
-                                    return False
-                            if func_dict[curr_func] == "alt_func":
-                                if not disp_alt():
-                                    return False
-                            if old_func != curr_func:
-                                old_func = curr_func
-                                clr_buttons()
-                            #lcd_pr_msgs()
-                            gc.collect()
+                    if ac_stat == ac_stopped:
+                        ac_is_stopped()
+                    elif ac_stat == ac_taxying:
+                        ac_is_taxying(False)
+                        #startup = 0
+                    elif ac_stat == ac_flying:
+                        if startup == -1:
+                            gr.clear()
+                        time.sleep(0.1)  # give a break to handle interrupts
+                        #led_toggle()  # we toggle elsewhere (when receiving msg in ck_uart() )
+                        if func_dict[curr_func] == "crs_func":
+                            if not disp_crs():
+                                return False
+                        if func_dict[curr_func] == "pos_func":
+                            if not disp_pos():
+                                return False
+                        if func_dict[curr_func] == "gs_func":
+                            if not disp_gs():
+                                return False
+                        if func_dict[curr_func] == "alt_func":
+                            if not disp_alt():
+                                return False
+                        if old_func != curr_func:
+                            old_func = curr_func
+                            clr_buttons()
+                        gc.collect()
+
                         startup = 0
                     else:
-                        if t_parked_init == 0.00:
-                            t_parked_init = time.ticks_ms()
+                        pass
                 else:
                     split_err = True
                 if split_err == True:
@@ -1210,7 +1147,7 @@ ck_uart(void) -> nr_bytes
         Return: nr_bytes
 """
 def ck_uart():
-    global rx_buffer, msg_nr, loop_time, nRMC, nGGA
+    global rx_buffer, msg_nr, loop_time, nRMC, nGGA, GPRMC_lst, GPGGA_lst, le_GPRMC_lst, le_GPGGA_lst
     TAG = 'ck_uart(): '
     nr_bytes = i = 0
     delay_ms = 0.3
@@ -1224,8 +1161,6 @@ def ck_uart():
     le_GPGGA_lst = 0
     GPRMC_done = False
     GPGGA_done = False
-    nrGPRMC_bytes = 0
-    nrGPGGA_bytes = 0
     i = 0
     while True:
         try:
@@ -1270,7 +1205,6 @@ def ck_uart():
                 if not GPRMC_done:
                     nGPRMC = rx_buffer_s.find("$GPRMC")
                     if nGPRMC >= 0:
-                        nrGPRMC_bytes = nr_bytes
                         n = rx_buffer_s.find("$GPGGA")
                         if n >= 0:
                             GPRMC_msg = rx_buffer_s[:nGPGGA]
@@ -1299,7 +1233,6 @@ def ck_uart():
                         n = rx_buffer_s.find("$GPRMC")
                         if n > 0:
                             GPGGA_msg = rx_buffer_s[nGPGGA:n]
-                            nrGPGGA_bytes = nr_bytes
                         else:
                             GPGGA_msg = rx_buffer_s[nGPGGA:]
                         n = GPGGA_msg.find('\r\n')
@@ -1320,7 +1253,6 @@ def ck_uart():
                         
                 if GPRMC_done and GPGGA_done:
                     rx_buffer_s = GPRMC_msg + GPGGA_msg
-                    #nr_bytes = nrGPRMC_bytes + nrGPGGA_bytes
                     nr_bytes = len(rx_buffer_s)
                     rx_buffer = rx_buffer_s.encode('utf-8')
                     if my_debug:
@@ -1418,175 +1350,65 @@ def find_all(c):
     return f_dict
 
 """
-split_types(void) -> lResult
-        This function attempts to extract from rx_buffer items into a msg_lst list.
+add_data(void) -> lResult
+        This function collects and writes the received gps data to the my_msgs object.
         It truncates the variation longitudinal indicator letter in the last item
         (a combination of magnetic variation longitudinal indicator and a 2-character checksum).
         It moves the check_sum characters into a 12th element to this list and
         Parameters: None
-        Return: le2 (i.e.: len(msg_lst)). If it fails to split, a value of -1 will be returned
+        Return: le2 (i.e.: len(msg_lst)). If it fails to split, a value False will be returned
 
 """
-def split_types():
-    global rx_buffer, my_msgs, nRMC, nGGA, rmc_lst, msg_lst
-    TAG = "split_types(): "
+def add_data():
+    global my_msgs, GPRMC_lst, GPGGA_lst, le_GPRMC_lst, le_GPGGA_lst
+    TAG = "add_data(): "
     lResult = True
-    sRMC = sGGA = None
-    rmc_s = gga_s = ""
-    nr_RMC_items = nr_GGA_items = 0
-    le_b4 = le_aft = 0
-    nRMC_end = nGGA_end = 0
     lGPRMC_go = lGPGGA_go = False
-    msg_lst = []
-    rmc_lst = []
-    gga_lst = []
-    rmc_msg_lst = []
-    gga_msg_lst = []
-    t_alt = 0
-    le_dict = 0
 
-    if my_debug:
-        print(TAG+"entry...contents rx_buffer=", rx_buffer)
-    t_rx_buffer = rx_buffer.decode()
-    le_t_rx = len(t_rx_buffer)
-
-    f_dict = find_all(10)
-    if f_dict:
-        le_dict = len(f_dict)
-        if my_debug:
-            print(TAG+"f_dict= {}, length dict = {}".format(f_dict, le_dict))
-    if le_dict < 2:
-        print(TAG+"exiting... f_dict length < 2")
-        return False
-
-    if nRMC is None: # in ck_uart() already has been done a find for $GPRMC and if found set nRMC
-        nRMC = t_rx_buffer.find('$GPRMC')
-    if nGGA is None: # idem for $GPGGA and nGGA
-        nGGA = t_rx_buffer.find('$GPGGA')
-
-    if le_dict >= 1 and (nRMC < 0 or nRMC > f_dict[le_dict-1]):
-        print(TAG+"exiting.. nRMC = {}, f_dict[le_dict-1] = {}".format(nRMC, f_dict[le_dict-1]))
-        return False  # $GPRMC not in first or not in first two msgs
-
-    if nRMC >= 0:
-        rmc_s = t_rx_buffer[nRMC:nRMC+6]
-    if nGGA >= 0:
-        gga_s = t_rx_buffer[nGGA:nGGA+6]
-
-    if my_debug:
-        print(TAG+"nRMC=", nRMC)
-        print(TAG+"nGGA=", nGGA)
-
-    if nRMC >= 0 and nGGA >= 0:
-        if nRMC < nGGA:
-            if nRMC >= 0:
-                if le_dict == 1 or le_dict == 2:
-                    sRMC_end = f_dict[0]+1
-                    sRMC = t_rx_buffer[nRMC:f_dict[0]+1] # copy $GPRMC...\r\n'
-                    if my_debug:
-                        print(TAG+"sRMC = t_rx_buffer[{}:{}]".format(nRMC, sRMC_end))
-                if le_dict == 3:
-                    sRMC = t_rx_buffer[nRMC:f_dict[1]+1] # idem
-            if nGGA > 0:
-                if le_dict == 2:
-                    if nGGA > f_dict[1]:
-                        nGGA_end = le_t_rx
-                    else:
-                        nGGA_end = f_dict[1]+1
-                    sGGA = t_rx_buffer[nGGA:nGGA_end] # copy $GPGGA...\r\n'
-                    if my_debug:
-                        print(TAG+"sGGA = t_rx_buffer[{}:{}]".format(nGGA, nGGA_end))
-                if le_dict == 3:
-                    sGGA = t_rx_buffer[nGGA:f_dict[2]+1] # idem
-        elif nGGA < nRMC:
-            if nGGA >= 0:
-                if le_dict == 1 or le_dict == 2:
-                    nGGA_end = f_dict[0]+1
-                    sGGA = t_rx_buffer[nGGA:nGGA_end] # copy $GPGGA...\r\n'
-                    if my_debug:
-                        print(TAG+"sGGA = t_rx_buffer[{}:{}]".format(nGGA, nGGA_end))
-                if le_dict == 3:
-                    sGGA = t_rx_buffer[nGGA:f_dict[1]+1] # idem
-            if nRMC > 0:
-                if le_dict == 2:
-                    if nRMC > f_dict[1]:
-                        nRMC_end = le_t_rx
-                    else:
-                        nRMC_end = f_dict[1]+1
-                    sRMC = t_rx_buffer[nRMC:nRMC_end] # copy $GPRMC...\r\n'
-                    if my_debug:
-                        print(TAG+"sRMC = t_rx_buffer[{}:{}]".format(nRMC, nRMC_end))
-                if le_dict == 3:
-                    sRMC = t_rx_buffer[nRMC:f_dict[2]+1] # idem
-
-    if my_debug:
-        print(TAG+"nRMC= ", nRMC)
-        print(TAG+"rmc_s=", rmc_s)
-        print(TAG+"sRMC=", sRMC)
-
-        print(TAG+"nGGA= ", nGGA)
-        print(TAG+"gga_s=", gga_s)
-        print(TAG+"sGGA=", sGGA)
-
-    lIsStr = isinstance(sRMC,str)
-    if lIsStr:
-        rmc_msg_lst = sRMC.split(",")
-        nr_RMC_items = len(rmc_msg_lst)
-        if my_debug:
-            print(TAG+f"RMC items= {rmc_msg_lst}, nr RMC items= {nr_RMC_items}")
-        if nr_RMC_items == 12:
+    if le_GPRMC_lst == 12 and le_GPGGA_lst == 15:
+        if not my_debug:
+            print(TAG+f"We're using GPS data from rcvd GPRMC and GPGGA msgs.\nNr GPRMC items= {le_GPRMC_lst}. Nr of GPGGA items= {le_GPGGA_lst}")
+        rmc_lst = [
+            GPRMC_lst[0],   # id
+            GPRMC_lst[3],   # lat
+            GPRMC_lst[4],   # latdir
+            GPRMC_lst[5],   # lon
+            GPRMC_lst[6],   # londir
+            GPRMC_lst[7],   # gs
+            GPRMC_lst[8],   # track true
+            GPRMC_lst[9],   # date
+            GPRMC_lst[10],  # var
+            GPRMC_lst[11]   # vardir
+        ]
+        if le_GPRMC_lst == 12:
             lGPRMC_go = True
-            rmc_msg_lst[11] = rmc_msg_lst[11][:1]  # extract 'E' or 'W' from (e.g.:) 'E*72'
+            GPRMC_lst[11] = GPRMC_lst[11][:1]  # extract 'E' or 'W' from (e.g.:) 'E*72'
             
-    lIsStr = isinstance(sGGA,str)
-    if lIsStr:
-        nGGA_ID = sGGA.find("$")
-        if nGGA_ID > 0:
-            pass
-        else:
-            gga_msg_lst = sGGA.split(",")
-            nr_GGA_items = len(gga_msg_lst)
-            if nr_GGA_items == 15:
-                if my_debug:
-                    print(TAG+f"type(gga_msg_lst[9])= {type(gga_msg_lst[9])}, value= {gga_msg_lst[9]}")
-                t_alt = float(gga_msg_lst[9])
-                if my_debug:
-                    print(TAG+f"t_alt = {t_alt}, type(t_alt)= {type(t_alt)}")
-                p = isinstance(t_alt,float)
-                if p == True:
-                    #                 alt
-                    t_alt = round(int(t_alt) * 3.2808)  # convert meters into feet
-                else:
-                    t_alt = 0
-                lGPGGA_go = True
-
-        if lGPRMC_go == True:
-            rmc_lst = [
-                rmc_msg_lst[0],   # id
-                rmc_msg_lst[3],   # lat
-                rmc_msg_lst[4],   # latdir
-                rmc_msg_lst[5],   # lon
-                rmc_msg_lst[6],   # londir
-                rmc_msg_lst[7],   # gs
-                rmc_msg_lst[8],   # track true
-                rmc_msg_lst[9],   # date
-                rmc_msg_lst[10],  # var
-                rmc_msg_lst[11]   # vardir
-            ]
-
-            if lGPGGA_go == True:
-                rmc_lst.append(str(t_alt))
+        if le_GPGGA_lst == 15:
+            if my_debug:
+                print(TAG+f"type(GPGGA_lst[9])= {type(GPGGA_lst[9])}, value= {GPGGA_lst[9]}")
+            t_alt = float(GPGGA_lst[9])
+            if my_debug:
+                print(TAG+f"t_alt = {t_alt}, type(t_alt)= {type(t_alt)}")
+            p = isinstance(t_alt,float)
+            if p == True:
+                #                 alt
+                t_alt = round(int(t_alt) * 3.2808)  # convert meters into feet
             else:
-                rmc_lst.append("0")
+                t_alt = 0
+            lGPGGA_go = True
+            
+        if lGPGGA_go == True:
+            rmc_lst.append(str(t_alt))
+        else:
+            rmc_lst.append("0")
+        
+        my_msgs.write(rmc_lst)
+    
 
-            if not my_debug:
-                print(TAG+"rmc_lst=", rmc_lst)
-
-            my_msgs.write(rmc_lst)
         if my_debug:
-           print(TAG+"cross-check: my_msgs class data contents: {}".format(my_msgs.read(ALT)), end="\n")
-
-    empty_buffer() # not emptying the buffer here causes an error in lcd_pr_msgs() !!!
+            print(TAG+"cross-check: my_msgs class data contents: {}".format(my_msgs.read(ALT)), end="\n")
+    
     if lGPRMC_go == False and lGPGGA_go == False:
         lResult = False
 
@@ -1605,90 +1427,6 @@ def time_elapsed(t1, t2):
         t3 = t1 - t2
     return t3  # (t3 + t_corr) // t_make_ms
 
-def lcd_pr_msgs():
-    global startup, loop_time, t_elapsed, msg_nr, my_msgs, lcd_maxrows, lacStopMsgShown, lac_Stopped
-    TAG = "lcd_pr_msgs(): "
-    dp = 0
-    msg_itm = 0
-    lcd_vpos = 0
-    s = s0 = ""
-
-    gps_dict = {}
-
-    if id == 'espressif_esp32s3_box':
-        degs = chr(0xb0)  # if font = "/fonts/helvR12.pcf"
-    else:
-        degs = chr(0xdf)
-    #lac_Stopped = False
-    #lacStopMsgShown = False
-    if startup == -1 or lacStopMsgShown:
-        pass
-        # gr.clear()
-    s = "{:0>2d}".format(msg_nr)
-    if isinstance(gps_dict, dict):
-        if 0 in gps_dict.keys():
-            if isinstance(gps_dict[0], dict):
-                x_tmp = gps_dict[0]
-            else:
-                x_tmp = {}
-        else:
-            x_tmp = {}
-            
-    else:
-        x_tmp = {}
-    gps_dict[0] = {18, 0, s}
-    gps_dict[5] = ' '*max_text_len  # clear status line
-    scroll_text(s, False)
-    gps_dict[0] = x_tmp  # restore x
-    lcd_vpos = 1
-    itms_lst = [LAT, LON, GS, CRS]
-    led_toggle()
-    for msg_itm in itms_lst:
-        if msg_itm == LAT:
-            lat_v = my_msgs.read(LAT)
-            dp = lat_v.find(".")
-            if dp >= 0:
-                if dp == 4:
-                    s0 = "{: >2s}{}{:0>2s}\'{:0>2s}.{:0>2s}\"".format(lat_v[:2], degs, lat_v[2:4], lat_v[5:7],lat_v[7:])
-                elif dp == 3:
-                    s0 = "{: >2s}{}{:0>2s}\'{:0>2s}.{:0>2s}\" ".format(lat_v[:1], degs, lat_v[1:3], lat_v[4:6],lat_v[6:])
-            s = my_msgs.read(LATDIR) + "    " + s0
-        if msg_itm == LON:
-            lon_v = my_msgs.read(LON)
-            dp = lon_v.find(".")
-            if dp >= 0:
-                if dp == 5:
-                    s0 = "{: >2s}{}{:0>2s}\'{:0>2s}.{:0>2s}\"".format(lon_v[:3], degs, lon_v[3:5], lon_v[6:8], lon_v[8:])
-                elif dp == 4:
-                    s0 = "{: >2s}{}{:0>2s}\'{:0>2s}.{:0>2s}\" ".format(lon_v[:2], degs, lon_v[2:4], lon_v[5:7], lon_v[7:])
-            s = my_msgs.read(LONDIR) + "   " + s0
-        if msg_itm == GS:
-            #gs0 = my_msgs.read(gs)
-            s = "GS  {: >3d} ALT {: >5d} FT".format(round(int(float(my_msgs.read(GS)))),
-                round(int(float(my_msgs.read(ALT)))))
-        if msg_itm == CRS:
-            #crs0 = my_msgs.read(crs)
-            s = "CRS {:0>3d} DEGS     ".format(round(int(float(my_msgs.read(CRS)))))
-
-        gps_dict[lcd_vpos] = s
-        time.sleep(0.5)
-        lcd_vpos += 1
-
-    print(TAG)
-    for _ in range(len(gps_dict)):
-        print(gps_dict[_])
-    
-    t_elapsed = time_elapsed(loop_time, time.ticks_ms())
-    print(TAG+"Duration rx -> lcd: {} mSecs".format(t_elapsed), end="\n")
-
-    my_msgs.clean()
-
-
-    lcd_vpos += 1
-    if lcd_vpos >= lcd_maxrows:
-        lcd_vpos = 0
-
-    led_toggle()
 
 """
 led_toggle(void) -> void

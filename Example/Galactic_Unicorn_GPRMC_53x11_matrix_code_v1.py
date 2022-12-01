@@ -1322,32 +1322,6 @@ def ck_uart():
             nr_bytes = -1
     return nr_bytes
 
-"""
-find_all(c) -> f_dict
-    This function searches the rx_buffer for occurrances of param c.
-    
-    Param: str c
-    Return: f_dict
-"""
-def find_all(c):
-    #global rx_buffer
-    f_dict = {}
-    if c is None:
-        return 0
-    if type(c) is int:
-        c2 = chr(c)
-    elif type(c) is str:
-        c2 = c
-    t_rx_buffer = rx_buffer.decode()
-    le = len(t_rx_buffer)
-    if le > 0:
-        ret = t_rx_buffer.count(c2)
-        o_cnt = 0
-        for i in range(le):
-            if t_rx_buffer[i] == c2:
-                f_dict[o_cnt] = i
-                o_cnt += 1
-    return f_dict
 
 """
 add_data(void) -> lResult

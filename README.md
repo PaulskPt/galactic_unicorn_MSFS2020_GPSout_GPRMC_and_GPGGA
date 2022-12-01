@@ -22,10 +22,10 @@ e) a small breadboard to put on the CP2102N and connect the dupont male SH pins.
 
 Flow of the GPS data:  PC MSFS2020 w FSUIPC7 > COMx > CP2102n TX/RX > to one of the two I2C connectors on the back of the Galactic Unicorn (preferebly #1).
 ```
-Serial connection: CP2102N TX > Galactic Unicorn I2C SDA (yellow wire)
-                   CP2102N RX > Galactic Unicorn I2C SCL (blue wire)
-                   CP2102N 3V > Galactic Uniforn I2C Vcc (red wire)
-                   CP2102N GND > Galactic Unicorn I2C GND (black wire)
+Serial connection:      CP2102N TX  > Galactic Unicorn I2C SDA (yellow wire)
+                        CP2102N RX  > Galactic Unicorn I2C SCL (blue wire)
+                        CP2102N GND > Galactic Unicorn I2C GND (black wire)
+NOTE: do not connect:   CP2102N 3V  > Galactic Uniforn I2C Vcc (red wire) (see 'IMPORTANT NOTE' below)
 ```
 This project uses micropython.
 

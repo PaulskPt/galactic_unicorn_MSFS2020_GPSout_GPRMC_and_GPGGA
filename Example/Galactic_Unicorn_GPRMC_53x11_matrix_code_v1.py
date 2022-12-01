@@ -252,6 +252,7 @@ max_text_len = 25
 rx_buffer_len = 120
 rx_buffer = ""
 msg_lst = [] # Create an empty message list. Will later be filled with the GPRMC message parts splitted
+s_telapsed = "Time elapsed between uart rx and GU matrix presentation: "
 
 # Pre-definition to prevent ... isn't defined
 #def scroll_text(msg):
@@ -1837,7 +1838,7 @@ def disp_crs():
             s = "TRACK " + s_tmg_true + " degs (T)"
         #if my_debug:
         print(TAG+s)
-        print(TAG+"Time elapsed between uart rx and GU matrix presentation: {:5.2f} in mSecs".format(time_elapsed(loop_time, time.ticks_ms())), end="\n")
+        print(TAG+s_telapsed+"{:5.2f} in mSecs".format(time_elapsed(loop_time, time.ticks_ms())), end="\n")
 
         if lDispMagOrTru:
             ribbon.set_heading_fm_sim(trk_mag)
@@ -1875,6 +1876,7 @@ def disp_pos():
     gr.set_pen(WHITE)
     print(TAG+"Pos= {s1}/{s2}")
     scroll_text(s1, False)
+    print(TAG+s_telapsed+"{:5.2f} in mSecs".format(time_elapsed(loop_time, time.ticks_ms())), end="\n")
     time.sleep(2)
     gr.clear()
     print(TAG+s2)
@@ -1890,6 +1892,7 @@ def disp_gs():
     #outline_text("Disp GS", 4, 2, cnt=0)
     print(TAG, t_gs)
     scroll_text(t_gs, False)
+    print(TAG+s_telapsed+"{:5.2f} in mSecs".format(time_elapsed(loop_time, time.ticks_ms())), end="\n")
     time.sleep(3)
     return True
 
@@ -1901,6 +1904,7 @@ def disp_alt():
     #outline_text("Disp ALT", 4, 2, cnt=0)
     print(TAG+f"ALT= ", t_alt)
     scroll_text(t_alt, False)
+    print(TAG+s_telapsed+"{:5.2f} in mSecs".format(time_elapsed(loop_time, time.ticks_ms())), end="\n")
     time.sleep(3)
     return True
 

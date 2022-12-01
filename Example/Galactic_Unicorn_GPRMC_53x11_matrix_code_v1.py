@@ -938,7 +938,7 @@ def ck_gs():
 
 def nodata():
     global ac_stat
-    TAG= "nodata()"
+    TAG= "nodata(): "
     s = "no data"
     if ac_stat != ac_no_data:
         ac_stat = ac_no_data

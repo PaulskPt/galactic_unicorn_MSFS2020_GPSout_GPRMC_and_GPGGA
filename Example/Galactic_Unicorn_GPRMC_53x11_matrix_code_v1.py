@@ -1848,9 +1848,9 @@ def disp_crs():
         if startup == -1 or lTrackDirChgd:
             lTrackDirChgd = False # reset flag
             if lDispMagOrTru:
-                scroll_text("TRK: MAG", False)
+                scroll_text("TRK MAG", False)
             else:
-                scroll_text("TRK: TRUE", False)
+                scroll_text("TRK TRUE", False)
             time.sleep(2)
             gr.clear
         gr.set_pen(gr.create_pen(int(BACKGROUND_COLOUR[0]), int(BACKGROUND_COLOUR[1]), int(BACKGROUND_COLOUR[2])))

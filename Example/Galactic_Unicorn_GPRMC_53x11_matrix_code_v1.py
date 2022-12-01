@@ -17,21 +17,20 @@
         b'$GPRMC,151948.00,A,5031.8614,N,00005.2524,E,83.0,315.1,201122,0.5,E*6A\r\n'
         b'$GPGGA,151948.00,5031.8614,N,00005.2524,E,1,05,0.0,914.4,M,0.0,M,0.0,0000*77\r\n'
         
-    This version has a modified ck_uart()
-    Now ck_uart tries to read a full line through uart.readline()
-    If this gives an error "NoneType has no attribute 'readline()'
-    ck_uart will try c = uart.read() and then if a character has been received.
+    Function ck_uart() tries to read a full line through uart.readline()
     The data received is a bytearray. This bytearray is converted into a text buffer (rx_buffer_s).
+    In the case the received data results in a None for 100 times, the function nodata() will be called
+    which displays "nodata". If more than 1000 times there is no data, the function ck_uart() will exit
+    with a value of 0.
     
-    Next the received GPRMC GPS datagram will be split into twelve data items, saved as a GPRMC_lst list.
+    The received GPRMC GPS datagram will be split into twelve data items, saved as a GPRMC_lst list.
     The received GPGGA GPS datagram will be split into fifteen data items, saved as a GPGGA_lst list.
     The groundspeed data is used to discern if the airplane is moving or not. 
-    When the groundspeed is zero, the text 'A/C Parked' is displayed. When the groundspeed is between
+    When the groundspeed is zero, the text 'ac parked' is displayed. When the groundspeed is between
     0.2 and 30 KTS the text 'taxying' is displayed. Above a groundspeed of 30 KTS the flown track,
     the airplane's position, the groundspeed or the altitude will be displayed, depending the choice
     the user made, using the A or B button.
-  
-    
+
     Update 2022-07-23.
     Updated the micropython firmware to v1.19
     Modified the appearance of DIGIT nrs: '6' and '9'.

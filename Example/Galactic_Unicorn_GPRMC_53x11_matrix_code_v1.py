@@ -1,4 +1,8 @@
 #!/usr/bin/python3
+# SPDX-FileCopyrightText: 2022 Paulus Schulinck
+#
+# SPDX-License-Identifier: MIT
+###############################
 """
     FOR USE WITH MICROPYTHON 
 
